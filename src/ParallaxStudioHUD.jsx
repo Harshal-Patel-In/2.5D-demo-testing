@@ -3,13 +3,6 @@ import './ParallaxStudioHUD.css';
 
 /**
  * Parallax Studio HUD v2.0 (The Framefields Paradigm)
- * 
- * Interactive browser telemetry controller and spatial pin annotation engine.
- * - Live tuning for Display Mode (Cover vs Fit), Zoom, Focal Plane, Bokeh aperture, wind sway, inertia.
- * - Mobile Gyroscope indicator & iOS 13+ permission request button.
- * - "Save & Sync with Agent": Saves telemetry into .parallax/session.json.
- * - "Spatial Pin Mode": Click on the 3D canvas to drop critique pins (saved to .parallax/notes.json).
- * - "Finalize & Clean Export": Strips telemetry scaffolding for production deployment.
  */
 export function ParallaxStudioHUD({
   telemetry,
@@ -24,7 +17,7 @@ export function ParallaxStudioHUD({
   const [isOpen, setIsOpen] = useState(true);
   const [syncStatus, setSyncStatus] = useState('Idle');
   const [isPinMode, setIsPinMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('telemetry'); // 'telemetry' | 'annotations'
+  const [activeTab, setActiveTab] = useState('telemetry');
   const [noteText, setNoteText] = useState('');
   const [pendingPin, setPendingPin] = useState(null);
 
@@ -33,7 +26,6 @@ export function ParallaxStudioHUD({
     if (!isPinMode) return;
 
     const handleCanvasClick = (e) => {
-      // Don't intercept clicks inside the HUD itself
       if (e.target.closest('#parallax-studio-hud')) return;
 
       const normX = parseFloat((e.clientX / window.innerWidth).toFixed(3));
@@ -128,33 +120,48 @@ export function ParallaxStudioHUD({
         </button>
       </div>
 
-      {/* Gyroscope Sensor Status & iOS Permission Banner */}
-      {gyro?.permissionNeeded && (
-        <div style={{ marginBottom: '10px' }}>
-          <button
-            onClick={gyro.requestPermission}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              color: '#fff',
-              fontWeight: 700,
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '11px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-            }}
-          >
-            <span>📱</span>
-            <span>Enable Mobile Gyroscope</span>
-          </button>
-        </div>
-      )}
+      {/* Gyroscope / Motion Sensor Controller */}
+      <div style={{ marginBottom: '10px' }}>
+        <button
+          onClick={gyro?.requestPermission}
+          style={{
+            width: '100%',
+            padding: '7px 10px',
+            background: gyro?.gyroActive
+              ? 'linear-gradient(135deg, #059669, #047857)'
+              : gyro?.simulatedTilt
+              ? 'linear-gradient(135deg, #d97706, #b45309)'
+              : 'linear-gradient(135deg, #10b981, #059669)',
+            color: '#fff',
+            fontWeight: 700,
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '11px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+            transition: 'all 0.2s',
+          }}
+        >
+          <span>📱</span>
+          <span>
+            {gyro?.isMobile
+              ? gyro?.gyroActive
+                ? '✓ Gyroscope Connected'
+                : gyro?.permissionStatus === 'requesting'
+                ? 'Connecting Sensor...'
+                : gyro?.permissionStatus === 'insecure'
+                ? '⚠️ Sensor Needs HTTPS'
+                : 'Enable Mobile Gyroscope'
+              : gyro?.simulatedTilt
+              ? '⏹ Stop Gyro Simulation'
+              : 'Test Mobile Tilt (Simulate)'}
+          </span>
+        </button>
+      </div>
 
       {/* Mode Navigation Tabs */}
       <div className="hud-tabs">
@@ -180,11 +187,15 @@ export function ParallaxStudioHUD({
       {/* Tab 1: Live Telemetry Controls */}
       {activeTab === 'telemetry' && (
         <section>
-          {/* Sensor Mode Status Pill */}
+          {/* Tracking Mode Status Indicator */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', fontSize: '10px' }}>
-            <span style={{ color: '#71717a' }}>Input Tracking:</span>
+            <span style={{ color: '#71717a' }}>Motion Mode:</span>
             <span style={{ color: gyro?.gyroActive ? '#34d399' : '#f59e0b', fontWeight: 600 }}>
-              {gyro?.gyroActive ? '📱 Gyroscope Active' : '🖱️ Pointer / Touch'}
+              {gyro?.simulatedTilt
+                ? '🔄 Mobile Simulation'
+                : gyro?.gyroActive
+                ? '📱 Physical Gyroscope'
+                : '🖱️ Mouse Tracking'}
             </span>
           </div>
 
