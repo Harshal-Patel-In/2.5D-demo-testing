@@ -1,0 +1,32 @@
+{
+  "name": "parallax-anime-wallpaper",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.78.2",
+    "@react-three/fiber": "^8.13.7",
+    "@react-three/postprocessing": "^2.14.13",
+    "@types/three": "^0.155.0",
+    "meshline": "^3.1.6",
+    "postprocessing": "6.37.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.0"
+  },
+  "overrides": {
+    "postprocessing": "6.37.7"
+  },
+  "resolutions": {
+    "postprocessing": "6.37.7"
+  }
+}
