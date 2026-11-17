@@ -21,7 +21,6 @@ export function ParallaxStudioHUD({
   const [noteText, setNoteText] = useState('');
   const [pendingPin, setPendingPin] = useState(null);
 
-  // Global click listener for Spatial Pin Annotation when in Pin Mode
   useEffect(() => {
     if (!isPinMode) return;
 
@@ -120,17 +119,15 @@ export function ParallaxStudioHUD({
         </button>
       </div>
 
-      {/* Gyroscope / Motion Sensor Controller */}
+      {/* Real Hardware Gyroscope Controller */}
       <div style={{ marginBottom: '10px' }}>
         <button
-          onClick={gyro?.requestPermission}
+          onClick={gyro?.startGyro}
           style={{
             width: '100%',
             padding: '7px 10px',
             background: gyro?.gyroActive
               ? 'linear-gradient(135deg, #059669, #047857)'
-              : gyro?.simulatedTilt
-              ? 'linear-gradient(135deg, #d97706, #b45309)'
               : 'linear-gradient(135deg, #10b981, #059669)',
             color: '#fff',
             fontWeight: 700,
@@ -143,24 +140,21 @@ export function ParallaxStudioHUD({
             justifyContent: 'center',
             gap: '6px',
             boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-            transition: 'all 0.2s',
           }}
         >
           <span>📱</span>
           <span>
-            {gyro?.isMobile
-              ? gyro?.gyroActive
-                ? '✓ Gyroscope Connected'
-                : gyro?.permissionStatus === 'requesting'
-                ? 'Connecting Sensor...'
-                : gyro?.permissionStatus === 'insecure'
-                ? '⚠️ Sensor Needs HTTPS'
-                : 'Enable Mobile Gyroscope'
-              : gyro?.simulatedTilt
-              ? '⏹ Stop Gyro Simulation'
-              : 'Test Mobile Tilt (Simulate)'}
+            {gyro?.gyroActive
+              ? `✓ Gyro Active (R:${gyro.rawAngles.gamma}°, P:${gyro.rawAngles.beta}°)`
+              : 'Enable Real Hardware Gyroscope'}
           </span>
         </button>
+
+        {gyro?.errorMsg && (
+          <p style={{ color: '#f87171', fontSize: '10px', marginTop: '4px', textAlign: 'center', fontFamily: 'monospace' }}>
+            ⚠️ {gyro.errorMsg}
+          </p>
+        )}
       </div>
 
       {/* Mode Navigation Tabs */}
@@ -189,13 +183,9 @@ export function ParallaxStudioHUD({
         <section>
           {/* Tracking Mode Status Indicator */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', fontSize: '10px' }}>
-            <span style={{ color: '#71717a' }}>Motion Mode:</span>
-            <span style={{ color: gyro?.gyroActive ? '#34d399' : '#f59e0b', fontWeight: 600 }}>
-              {gyro?.simulatedTilt
-                ? '🔄 Mobile Simulation'
-                : gyro?.gyroActive
-                ? '📱 Physical Gyroscope'
-                : '🖱️ Mouse Tracking'}
+            <span style={{ color: '#71717a' }}>Hardware Sensor:</span>
+            <span style={{ color: gyro?.gyroActive ? '#34d399' : '#a1a1aa', fontWeight: 600 }}>
+              {gyro?.gyroActive ? 'Connected & Reading' : 'Mouse / Touch Fallback'}
             </span>
           </div>
 

@@ -2,146 +2,99 @@ import { useState, useEffect, useRef } from 'react';
 import { MathUtils } from 'three';
 
 /**
- * Robust Mobile Gyroscope & Desktop Tilt Simulation Hook
+ * Real Hardware Gyroscope & Accelerometer Controller
+ * Strictly uses real physical deviceorientation readings from the device sensor.
  */
 export function useGyroscope() {
-  const isMobile =
-    typeof navigator !== 'undefined' &&
-    (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
-      (navigator.maxTouchPoints > 1 && !/Windows NT/i.test(navigator.userAgent)));
-
-  const isSecure = typeof window !== 'undefined' && window.isSecureContext;
-
-  const [hasGyro, setHasGyro] = useState(isMobile);
   const [gyroActive, setGyroActive] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState('idle'); // 'idle' | 'requesting' | 'granted' | 'denied' | 'insecure' | 'unavailable'
-  const [simulatedTilt, setSimulatedTilt] = useState(false);
-
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [rawAngles, setRawAngles] = useState({ gamma: 0, beta: 0 });
   const coordsRef = useRef({ x: 0, y: 0, active: false });
 
-  // Desktop tilt simulation loop
-  useEffect(() => {
-    if (!simulatedTilt) return;
+  const handleOrientation = (e) => {
+    const gamma = e.gamma; // Roll: [-90, 90]
+    const beta = e.beta;   // Pitch: [-180, 180]
 
-    let animId;
-    let startTime = Date.now();
+    // Some desktop browsers fire dummy events with null values
+    if (gamma === null || beta === null) return;
 
-    const animateSim = () => {
-      const t = (Date.now() - startTime) * 0.0015;
-      // Simulate natural hand tilt
-      coordsRef.current.x = Math.sin(t * 1.2) * 0.55;
-      coordsRef.current.y = Math.cos(t * 0.9) * 0.45;
-      coordsRef.current.active = true;
-      setGyroActive(true);
-      animId = requestAnimationFrame(animateSim);
-    };
+    // Real hardware sensor detected
+    coordsRef.current.active = true;
+    setGyroActive(true);
+    setErrorMsg(null);
+    setRawAngles({
+      gamma: Math.round(gamma),
+      beta: Math.round(beta),
+    });
 
-    animId = requestAnimationFrame(animateSim);
-    return () => {
-      cancelAnimationFrame(animId);
-      coordsRef.current.active = false;
-      setGyroActive(false);
-    };
-  }, [simulatedTilt]);
+    // Normalize:
+    // gamma: roll left/right [-30°, +30°] -> [-1.0, +1.0]
+    coordsRef.current.x = MathUtils.clamp(gamma / 30.0, -1.0, 1.0);
 
-  // Mobile orientation listener
-  useEffect(() => {
-    if (typeof window === 'undefined' || !isMobile) return;
+    // beta: pitch centered at natural 45° phone hold angle -> [-1.0, +1.0]
+    coordsRef.current.y = MathUtils.clamp((beta - 45.0) / 30.0, -1.0, 1.0);
+  };
 
-    const handleOrientation = (e) => {
-      if (e.gamma === null || e.beta === null) return;
+  const startGyro = async () => {
+    setErrorMsg(null);
 
-      coordsRef.current.active = true;
-      setGyroActive(true);
-      setPermissionStatus('granted');
-
-      // gamma: roll [-30, +30] -> [-1, 1]
-      // beta: pitch centered at natural 45° phone hold angle -> [-1, 1]
-      coordsRef.current.x = MathUtils.clamp(e.gamma / 30.0, -1.0, 1.0);
-      coordsRef.current.y = MathUtils.clamp((e.beta - 45.0) / 30.0, -1.0, 1.0);
-    };
-
-    // On Android/Chrome, events can be attached directly
-    if (
-      typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission !== 'function'
-    ) {
-      window.addEventListener('deviceorientation', handleOrientation);
-      return () => window.removeEventListener('deviceorientation', handleOrientation);
-    }
-  }, [isMobile]);
-
-  // Explicit user gesture request (required by iOS 13+)
-  const requestPermission = async () => {
-    if (!isMobile) {
-      // User is on desktop: toggle simulated mobile gyroscope tilt
-      setSimulatedTilt((prev) => !prev);
-      return;
-    }
-
-    // Insecure HTTP origin check on mobile
-    if (!isSecure && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-      setPermissionStatus('insecure');
-      alert('Mobile sensors require HTTPS when accessed over a local network IP.');
-      return;
-    }
-
-    setPermissionStatus('requesting');
-
-    // iOS 13+ permission request
+    // 1. iOS 13+ Safari Permission Flow
     if (
       typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function'
     ) {
       try {
-        const response = await DeviceOrientationEvent.requestPermission();
-        if (response === 'granted') {
-          setPermissionStatus('granted');
-          setGyroActive(true);
-          coordsRef.current.active = true;
-
-          const handleOrientation = (e) => {
-            if (e.gamma === null || e.beta === null) return;
-            coordsRef.current.x = MathUtils.clamp(e.gamma / 30.0, -1.0, 1.0);
-            coordsRef.current.y = MathUtils.clamp((e.beta - 45.0) / 30.0, -1.0, 1.0);
-          };
-
-          window.addEventListener('deviceorientation', handleOrientation);
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission === 'granted') {
+          window.addEventListener('deviceorientation', handleOrientation, true);
         } else {
-          setPermissionStatus('denied');
+          setErrorMsg('Permission denied by user.');
         }
       } catch (err) {
-        console.warn('Gyro request error:', err);
-        setPermissionStatus('denied');
+        setErrorMsg('Sensor error: ' + (err.message || 'Permission failed'));
       }
+      return;
+    }
+
+    // 2. Android Chrome / Standard Browsers: attach real listeners directly
+    if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
+      window.addEventListener('deviceorientation', handleOrientation, true);
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+
+      // Verify if physical sensor actually exists (fails on desktop PC)
+      setTimeout(() => {
+        if (!coordsRef.current.active) {
+          setErrorMsg('No hardware gyroscope detected on this device.');
+        }
+      }, 1000);
     } else {
-      // Non-iOS mobile or fallback: attach directly
-      try {
-        const handleOrientation = (e) => {
-          if (e.gamma === null || e.beta === null) return;
-          coordsRef.current.active = true;
-          setGyroActive(true);
-          setPermissionStatus('granted');
-          coordsRef.current.x = MathUtils.clamp(e.gamma / 30.0, -1.0, 1.0);
-          coordsRef.current.y = MathUtils.clamp((e.beta - 45.0) / 30.0, -1.0, 1.0);
-        };
-        window.addEventListener('deviceorientation', handleOrientation);
-        setPermissionStatus('granted');
-      } catch {
-        setPermissionStatus('unavailable');
-      }
+      setErrorMsg('DeviceOrientation is not supported by this browser.');
     }
   };
 
+  // Auto-listen on load for devices that do not require an explicit user prompt (Android)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (
+      typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission !== 'function'
+    ) {
+      window.addEventListener('deviceorientation', handleOrientation, true);
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+
+      return () => {
+        window.removeEventListener('deviceorientation', handleOrientation, true);
+        window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+      };
+    }
+  }, []);
+
   return {
-    isMobile,
-    isSecure,
-    hasGyro,
     gyroActive,
-    permissionStatus,
-    simulatedTilt,
-    setSimulatedTilt,
+    errorMsg,
+    rawAngles,
     coordsRef,
-    requestPermission,
+    startGyro,
   };
 }
