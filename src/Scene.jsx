@@ -5,11 +5,12 @@ import { Plane, useTexture } from '@react-three/drei';
 import { EffectComposer, DepthOfField, Vignette } from '@react-three/postprocessing';
 import './layerMaterial';
 import { ParallaxStudioHUD } from './ParallaxStudioHUD';
+import { useGyroscope } from './hooks/useGyroscope';
 
 const Z_CAM = 120.0;
 
 /**
- * Multiplane Parallax Experience with Autonomous Responsive Cover & Smooth Spatial Exploration
+ * Multiplane Parallax Experience with Autonomous Responsive Cover & Mobile Gyroscope Support
  */
 function Experience({
   layersConfig = [],
@@ -21,6 +22,7 @@ function Experience({
   windSway = 1.7,
   zoom = 1.0,
   displayMode = 'cover',
+  gyro,
 }) {
   const group = useRef();
   const planesRef = useRef([]);
@@ -89,17 +91,25 @@ function Experience({
 
     if (prefersReducedMotion) return;
 
-    // 1. Smooth pointer vector
-    movement.lerp(temp.set(state.pointer.x, state.pointer.y * 0.2, 0), 0.2);
+    // Determine motion source: Mobile Gyroscope tilt vs Pointer/Touch coords
+    let inputX = state.pointer.x;
+    let inputY = state.pointer.y;
 
-    // 2. Spatial Viewport Exploration (Panoramic Camera Tracking)
-    // Allows user to view hidden vertical headroom (top title text & bottom signatures) smoothly
+    if (gyro?.coordsRef?.current?.active) {
+      inputX = gyro.coordsRef.current.x;
+      inputY = gyro.coordsRef.current.y;
+    }
+
+    // 1. Smooth movement vector for Dual-Layer UV Parallax
+    movement.lerp(temp.set(inputX, inputY * 0.2, 0), 0.2);
+
+    // 2. Spatial Viewport Exploration (Camera Tracking)
     if (group.current) {
       const excessH = Math.max(0, baseDim - vpH);
-      const targetPanY = -state.pointer.y * (excessH * 0.42);
+      const targetPanY = -inputY * (excessH * 0.42);
 
       const excessW = Math.max(0, baseDim - vpW);
-      const targetPanX = -state.pointer.x * (excessW * 0.35 + mouseSensitivity.shiftX);
+      const targetPanX = -inputX * (excessW * 0.35 + mouseSensitivity.shiftX);
 
       group.current.position.x = MathUtils.lerp(group.current.position.x, targetPanX, lerpFactor);
       group.current.position.y = MathUtils.lerp(group.current.position.y, targetPanY, lerpFactor);
@@ -123,8 +133,8 @@ function Experience({
         const normZ = Math.min(1.0, Math.max(0.0, (layer.z || 0.0) / 50.0));
         const maxRotRad = (0.2 + Math.pow(normZ, 2.0) * 4.3) * (Math.PI / 180.0);
 
-        const targetRotX = state.pointer.y * maxRotRad * 0.45;
-        const targetRotY = -state.pointer.x * maxRotRad;
+        const targetRotX = inputY * maxRotRad * 0.45;
+        const targetRotY = -inputX * maxRotRad;
 
         plane.rotation.x = MathUtils.lerp(plane.rotation.x, targetRotX, lerpFactor);
         plane.rotation.y = MathUtils.lerp(plane.rotation.y, targetRotY, lerpFactor);
@@ -248,6 +258,8 @@ export default function Scene({
   onParticleStyleChange,
   children,
 }) {
+  const gyro = useGyroscope();
+
   const [telemetry, setTelemetry] = useState({
     focalTargetZ: heroFocusZ,
     bokehScale: bokehScale,
@@ -258,16 +270,7 @@ export default function Scene({
     displayMode: 'cover',
   });
 
-  const [notes, setNotes] = useState([
-    {
-      id: 1794636802128,
-      timestamp: '2026-11-14T06:13:22.128Z',
-      x: 0.442,
-      y: 0.29,
-      text: 'make it fully responsive to cover the screen in proper way on all screens',
-      resolved: true,
-    },
-  ]);
+  const [notes, setNotes] = useState([]);
 
   // Smooth mouse wheel zoom
   useEffect(() => {
@@ -313,6 +316,7 @@ export default function Scene({
             windSway={telemetry.windSway}
             zoom={telemetry.zoom}
             displayMode={telemetry.displayMode}
+            gyro={gyro}
           />
           <Effects focusZ={telemetry.focalTargetZ} bokehScale={telemetry.bokehScale} />
           {children}
@@ -329,6 +333,7 @@ export default function Scene({
           onAddNote={handleAddNote}
           particleStyle={particleStyle}
           onParticleStyleChange={onParticleStyleChange}
+          gyro={gyro}
         />
       )}
     </div>

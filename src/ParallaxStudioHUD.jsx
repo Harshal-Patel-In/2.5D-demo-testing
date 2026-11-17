@@ -5,7 +5,8 @@ import './ParallaxStudioHUD.css';
  * Parallax Studio HUD v2.0 (The Framefields Paradigm)
  * 
  * Interactive browser telemetry controller and spatial pin annotation engine.
- * - Live tuning for Display Mode (Cover vs Fit), Zoom, Focal Plane, Bokeh aperture, wind sway, and inertia.
+ * - Live tuning for Display Mode (Cover vs Fit), Zoom, Focal Plane, Bokeh aperture, wind sway, inertia.
+ * - Mobile Gyroscope indicator & iOS 13+ permission request button.
  * - "Save & Sync with Agent": Saves telemetry into .parallax/session.json.
  * - "Spatial Pin Mode": Click on the 3D canvas to drop critique pins (saved to .parallax/notes.json).
  * - "Finalize & Clean Export": Strips telemetry scaffolding for production deployment.
@@ -18,6 +19,7 @@ export function ParallaxStudioHUD({
   onAddNote,
   particleStyle = 'smoke',
   onParticleStyleChange,
+  gyro,
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const [syncStatus, setSyncStatus] = useState('Idle');
@@ -126,6 +128,34 @@ export function ParallaxStudioHUD({
         </button>
       </div>
 
+      {/* Gyroscope Sensor Status & iOS Permission Banner */}
+      {gyro?.permissionNeeded && (
+        <div style={{ marginBottom: '10px' }}>
+          <button
+            onClick={gyro.requestPermission}
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: '#fff',
+              fontWeight: 700,
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+            }}
+          >
+            <span>📱</span>
+            <span>Enable Mobile Gyroscope</span>
+          </button>
+        </div>
+      )}
+
       {/* Mode Navigation Tabs */}
       <div className="hud-tabs">
         <button
@@ -150,6 +180,14 @@ export function ParallaxStudioHUD({
       {/* Tab 1: Live Telemetry Controls */}
       {activeTab === 'telemetry' && (
         <section>
+          {/* Sensor Mode Status Pill */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', fontSize: '10px' }}>
+            <span style={{ color: '#71717a' }}>Input Tracking:</span>
+            <span style={{ color: gyro?.gyroActive ? '#34d399' : '#f59e0b', fontWeight: 600 }}>
+              {gyro?.gyroActive ? '📱 Gyroscope Active' : '🖱️ Pointer / Touch'}
+            </span>
+          </div>
+
           {/* Display Mode: Cover vs Fit */}
           <div className="hud-control-group">
             <div className="hud-label-row">
