@@ -1,8 +1,0 @@
-{
-  "focalTargetZ": 18.5,
-  "bokehScale": 0.5,
-  "windSway": 1.7,
-  "lerpAlpha": 0.05,
-  "smoothing": true,
-  "zoom": 0.85
-}

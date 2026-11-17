@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Parallax studio telemetry and notes
+.parallax/
+.parallax
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
